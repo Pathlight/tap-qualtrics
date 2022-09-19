@@ -20,7 +20,7 @@ from tap_qualtrics.exceptions import Qualtrics429Error, Qualtrics500Error, Qualt
     Qualtrics400Error, Qualtrics401Error, Qualtrics403Error
 
 HOST_URL = "https://{data_center}.qualtrics.com"
-REQUIRED_CONFIG_KEYS = ["start_date", "data_center", "client_id", "client_secret", "refresh_token"]
+REQUIRED_CONFIG_KEYS = ["start_date", "data_center", "use_api_token"]
 LOGGER = singer.get_logger()
 END_POINTS = {
     "refresh": "/oauth2/token",
@@ -142,6 +142,10 @@ def _refresh_token(config):
         raise Exception(response.text)
     return response.json()
 
+def uses_api_authorization(config):
+    use_api = config.get('use_api_token')
+    return use_api if use_api is not None else False
+
 
 def refresh_access_token_if_expired(config):
     # if [expires_in not exist] or if [exist and less then current time] then it will update the token
@@ -156,8 +160,12 @@ def refresh_access_token_if_expired(config):
 
 
 def header_setup(headers, config, path=None):
-    if refresh_access_token_if_expired(config) or "Authorization" not in headers:
-        headers["Authorization"] = f'bearer {config["access_token"]}'
+    if uses_api_authorization(config):
+        if "X-API-TOKEN" not in headers:
+            headers["X-API-TOKEN"] = config["api_token"]
+    else:
+        if refresh_access_token_if_expired(config) or "Authorization" not in headers:
+            headers["Authorization"] = f'bearer {config["access_token"]}'
     if path:
         url = HOST_URL.format(data_center=config["data_center"]) + path
         return headers, url
