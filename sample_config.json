@@ -1,7 +1,9 @@
 {
   "start_date": "2021-10-28",
   "data_center": "xxxx",
+  "data_center_origin": "xxxx",
   "client_id": "xxxxxxxxxxx",
   "client_secret": "xxxxxxxxxxxxxxxxxx",
-  "refresh_token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  "refresh_token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "api_token": "xxxxxxxxxxxxxxxxxx"
 }

@@ -20,7 +20,7 @@ from tap_qualtrics.exceptions import Qualtrics429Error, Qualtrics500Error, Qualt
     Qualtrics400Error, Qualtrics401Error, Qualtrics403Error
 
 HOST_URL = "https://{data_center}.qualtrics.com"
-REQUIRED_CONFIG_KEYS = ["start_date", "data_center", "client_id", "client_secret", "refresh_token"]
+REQUIRED_CONFIG_KEYS = ["start_date", "data_center"]
 LOGGER = singer.get_logger()
 END_POINTS = {
     "refresh": "/oauth2/token",
@@ -142,6 +142,10 @@ def _refresh_token(config):
         raise Exception(response.text)
     return response.json()
 
+def uses_api_authorization(config):
+    api_token = config.get('api_token')
+    return api_token is not None
+
 
 def refresh_access_token_if_expired(config):
     # if [expires_in not exist] or if [exist and less then current time] then it will update the token
@@ -155,11 +159,19 @@ def refresh_access_token_if_expired(config):
     return False
 
 
-def header_setup(headers, config, path=None):
-    if refresh_access_token_if_expired(config) or "Authorization" not in headers:
-        headers["Authorization"] = f'bearer {config["access_token"]}'
+def header_setup(headers, config, path=None, use_data_center_origin=False):
+    # For survey_responses, we cannot use the data center proxy and must specify
+    # the specific region for the API request.
+    # ex. "ca1.qualtrics.com" instead of "pathlight.qualtrics.com"
+    if uses_api_authorization(config):
+        if "X-API-TOKEN" not in headers:
+            headers["X-API-TOKEN"] = config["api_token"]
+    else:
+        if refresh_access_token_if_expired(config) or "Authorization" not in headers:
+            headers["Authorization"] = f'bearer {config["access_token"]}'
     if path:
-        url = HOST_URL.format(data_center=config["data_center"]) + path
+        data_center = config["data_center_origin"] if use_data_center_origin else config["data_center"]
+        url = HOST_URL.format(data_center=data_center) + path
         return headers, url
     return headers
 
@@ -173,11 +185,12 @@ def extract_survey_page(url, config, headers):
     return surveys, next_page
 
 
-def fetch_endpoint(config, stream_id):
+def fetch_endpoint(config, stream_id, use_data_center_origin=False):
     """ fetch list of Surveys & Groups for now """
     all_surveys = []
     endpoint = END_POINTS.get(stream_id)
-    url = HOST_URL.format(data_center=config["data_center"]) + endpoint
+    data_center = config["data_center_origin"] if use_data_center_origin else config["data_center"]
+    url = HOST_URL.format(data_center=data_center) + endpoint
     headers = {"Content-Type": "application/json"}
     _next = url
     while _next is not None:
@@ -190,12 +203,13 @@ def fetch_endpoint(config, stream_id):
 
 @backoff.on_exception(backoff.expo, Qualtrics429Error, max_tries=5, factor=2)
 @utils.ratelimit(1, 1)
-def setup_request(survey_id, payload, config):
+def setup_request(survey_id, payload, config, use_data_center_origin=False):
     """
     This method sets up the request and handles the setup of the request for the survey.
     """
     headers = {"Content-Type": "application/json"}
-    headers, url = header_setup(headers, config, path=END_POINTS["export_responses"].format(survey_id=survey_id))
+    path = END_POINTS["export_responses"].format(survey_id=survey_id)
+    headers, url = header_setup(headers, config, path=path, use_data_center_origin=use_data_center_origin)
     request = requests.post(url, data=json.dumps(payload), headers=headers)
     response = request.json()
 
@@ -211,6 +225,12 @@ def setup_request(survey_id, payload, config):
         raise Qualtrics401Error(
             'Qualtrics Error\n(Http Error: 401 - Unauthorized): The Qualtrics API user could not be authenticated or '
             'does not have authorization to access the requested resource.')
+    elif response['meta']['httpStatus'] == '400 - Bad Request':
+        # May receive a 400 response if the API user is improperly accessing a survey that is
+        # in a different datacenter.
+        LOGGER.info('Received 400 from the API')
+        LOGGER.info(response['meta'])
+        return None, None, None
     elif response['meta']['httpStatus'] != '200 - OK':
         raise Exception(str(response['meta']))
 
@@ -221,13 +241,21 @@ def setup_request(survey_id, payload, config):
 def get_survey_responses(survey_id, payload, config):
     """
     This method sends the request, and sets up the download request.
+
+    Note, we cannot use the data center proxy and must specify the specific region for the API request.
+    We therefore pass use_data_center_origin = True when setting up the requests.
+    ex. "ca1.qualtrics.com" instead of "pathlight.qualtrics.com"
+
     """
     is_file = None
     check_response = None
-    progress_id, url, headers = setup_request(survey_id, payload, config)
+    progress_id, url, headers = setup_request(survey_id, payload, config, use_data_center_origin=True)
+    if progress_id is None or url is None:
+        LOGGER.info('Skipping survey id: ' + survey_id)
+        return []
     progress_status = "in progress"
     while progress_status != "complete" and progress_status != "failed" and is_file is None:
-        headers = header_setup(headers, config)
+        headers = header_setup(headers, config, use_data_center_origin=True)
         check_url = url + progress_id
         check_request = requests.get(check_url, headers=headers)
         if check_request.status_code >= 300:
@@ -352,7 +380,7 @@ def sync_survey_responses(config, state, stream):
     start_date = singer.get_bookmark(state, stream.tap_stream_id, bookmark_column).split(" ")[0] \
         if state.get("bookmarks", {}).get(stream.tap_stream_id) else config["start_date"] + "T00:00:00Z"
 
-    list_surveys = fetch_endpoint(config, stream.tap_stream_id)
+    list_surveys = fetch_endpoint(config, stream.tap_stream_id, use_data_center_origin=True)
     list_surveys_id = [item["id"] for item in list_surveys]
 
     global_bookmark = start_date
