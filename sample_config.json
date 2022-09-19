@@ -5,6 +5,5 @@
   "client_id": "xxxxxxxxxxx",
   "client_secret": "xxxxxxxxxxxxxxxxxx",
   "refresh_token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-  "use_api_token": true,
   "api_token": "xxxxxxxxxxxxxxxxxx"
 }

@@ -20,7 +20,7 @@ from tap_qualtrics.exceptions import Qualtrics429Error, Qualtrics500Error, Qualt
     Qualtrics400Error, Qualtrics401Error, Qualtrics403Error
 
 HOST_URL = "https://{data_center}.qualtrics.com"
-REQUIRED_CONFIG_KEYS = ["start_date", "data_center", "use_api_token"]
+REQUIRED_CONFIG_KEYS = ["start_date", "data_center"]
 LOGGER = singer.get_logger()
 END_POINTS = {
     "refresh": "/oauth2/token",
@@ -143,8 +143,8 @@ def _refresh_token(config):
     return response.json()
 
 def uses_api_authorization(config):
-    use_api = config.get('use_api_token')
-    return use_api if use_api is not None else False
+    api_token = config.get('api_token')
+    return api_token is not None
 
 
 def refresh_access_token_if_expired(config):
