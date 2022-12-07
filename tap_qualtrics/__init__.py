@@ -17,7 +17,7 @@ from singer.catalog import Catalog, CatalogEntry
 from singer.schema import Schema
 from singer.transform import transform
 from tap_qualtrics.exceptions import Qualtrics429Error, Qualtrics500Error, Qualtrics503Error, Qualtrics504Error, \
-    Qualtrics400Error, Qualtrics401Error, Qualtrics403Error
+    Qualtrics400Error, Qualtrics401Error, Qualtrics403Error, Qualtrics404Error
 
 HOST_URL = "https://{data_center}.qualtrics.com"
 REQUIRED_CONFIG_KEYS = ["start_date", "data_center"]
@@ -225,6 +225,10 @@ def setup_request(survey_id, payload, config, use_data_center_origin=False):
         raise Qualtrics401Error(
             'Qualtrics Error\n(Http Error: 401 - Unauthorized): The Qualtrics API user could not be authenticated or '
             'does not have authorization to access the requested resource.')
+    elif response['meta']['httpStatus'] == '404 - Not Found':
+        raise Qualtrics404Error(
+            'Qualtrics Error\n(Http Error: 404 - Not Found): The Qualtrics resource could not be found or '
+            'the API user does not have authorization to access the requested resource.')
     elif response['meta']['httpStatus'] == '400 - Bad Request':
         # May receive a 400 response if the API user is improperly accessing a survey that is
         # in a different datacenter.
@@ -394,8 +398,13 @@ def sync_survey_responses(config, state, stream):
                 "format": "csv",
                 "compress": True
             }
+            try:
+                records = get_survey_responses(survey_id, payload, config)
+            except Qualtrics404Error:
+                # Continue to the next survey_id if the current survey is
+                # not found.
+                break
 
-            records = get_survey_responses(survey_id, payload, config)
             with singer.metrics.record_counter(stream.tap_stream_id) as counter:
                 pop_out_unnecessary_records(records)
                 for row in records:
