@@ -26,6 +26,13 @@ class Qualtrics403Error(Exception):
         super().__init__(msg)
 
 
+class Qualtrics404Error(Exception):
+    """This Exception handles errors associated with the HTTP 404 (Not Found) responses."""
+
+    def __init__(self, msg):
+        super().__init__(msg)
+
+
 class Qualtrics429Error(Exception):
     """This Exception handles errors associated with the HTTP 429 (Too Many Requests) responses."""
 
