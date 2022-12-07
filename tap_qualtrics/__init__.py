@@ -403,6 +403,7 @@ def sync_survey_responses(config, state, stream):
             except Qualtrics404Error:
                 # Continue to the next survey_id if the current survey is
                 # not found.
+                LOGGER.info('Received 404 from the API for survey_id %s', str(survey_id))
                 break
 
             with singer.metrics.record_counter(stream.tap_stream_id) as counter:
