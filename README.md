@@ -16,7 +16,7 @@ This tap:
 
 1. Install
 
-    pip install git+https://github.com/SageData-OOD/tap-qualtrics
+    pip install -e .
 
 2. Create the config file
 
