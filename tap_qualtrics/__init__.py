@@ -345,14 +345,27 @@ def refactor_property_name(record):
 
 
 def refactor_record_according_to_schema(record, stream_id, schema):
-    """ gathering all extra filed into custom property -> "other_properties": {...all extra properties...}  """
-
     if "Create New Field or Choose From Dropdown..." in record:
         record.pop("Create New Field or Choose From Dropdown...")
 
     record = refactor_property_name(record)
-    if stream_id == "surveys_responses":
-        record["other_properties"] = {r: record.pop(r) for r in record.copy() if r not in schema.get("properties")}
+    if stream_id != "surveys_responses":
+        return record
+
+    """
+    Since we're fetching data from https://api.qualtrics.com/41296b6f2e828-get-response-export-file
+    for surveys_responses, the returned data is different depending on the clients. For example:
+    - Client A tracks 'region' as a column, while
+    - Client B tracks 'total_price' as a column
+    When we encounter fields that are client dependant (i.e fields NOT in schemas/surveys_responses.json), 
+    add them into the custom property called "other_properties"
+    """
+    client_independant_fields = {
+        key: record.pop(key)
+        for key in record.copy()
+        if key not in schema.get("properties")
+    }
+    record["other_properties"] = client_independant_fields
     return record
 
 
