@@ -292,7 +292,10 @@ def get_survey_responses(survey_id, payload, config):
     download_url = url + is_file + '/file'
     headers = header_setup(headers, config)
     download_request = requests.get(download_url, headers=headers, stream=True)
-    if download_request.status_code >= 300:
+    if download_request.status_code == 500:
+        LOGGER.info('Internal server error downloading file for survey %s: %s', survey_id, download_url)
+        raise Qualtrics500Error(download_request.text)
+    elif download_request.status_code >= 300:
         raise Exception(download_request.text)
 
     with zipfile.ZipFile(io.BytesIO(download_request.content)) as survey_zip:
@@ -413,10 +416,10 @@ def sync_survey_responses(config, state, stream):
             }
             try:
                 records = get_survey_responses(survey_id, payload, config)
-            except Qualtrics404Error:
+            except (Qualtrics404Error, Qualtrics500Error) as e:
                 # Continue to the next survey_id if the current survey is
-                # not found.
-                LOGGER.info('Received 404 from the API for survey_id %s', str(survey_id))
+                # not found or an internal server error has occurred.
+                LOGGER.info('surveys_responses - received %s error for survey ID %s', e.status_code, str(survey_id))
                 break
 
             with singer.metrics.record_counter(stream.tap_stream_id) as counter:

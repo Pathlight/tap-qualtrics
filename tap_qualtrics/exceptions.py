@@ -10,6 +10,7 @@ class Qualtrics400Error(Exception):
 
     def __init__(self, msg):
         super().__init__(msg)
+        self.status_code = 400
 
 
 class Qualtrics401Error(Exception):
@@ -17,6 +18,7 @@ class Qualtrics401Error(Exception):
 
     def __init__(self, msg):
         super().__init__(msg)
+        self.status_code = 401
 
 
 class Qualtrics403Error(Exception):
@@ -24,6 +26,7 @@ class Qualtrics403Error(Exception):
 
     def __init__(self, msg):
         super().__init__(msg)
+        self.status_code = 403
 
 
 class Qualtrics404Error(Exception):
@@ -31,6 +34,7 @@ class Qualtrics404Error(Exception):
 
     def __init__(self, msg):
         super().__init__(msg)
+        self.status_code = 404
 
 
 class Qualtrics429Error(Exception):
@@ -38,6 +42,7 @@ class Qualtrics429Error(Exception):
 
     def __init__(self, msg):
         super().__init__(msg)
+        self.status_code = 429
 
 
 class Qualtrics500Error(Exception):
@@ -45,6 +50,7 @@ class Qualtrics500Error(Exception):
 
     def __init__(self, msg):
         super().__init__(msg)
+        self.status_code = 500
 
 
 class Qualtrics503Error(Exception):
@@ -52,6 +58,7 @@ class Qualtrics503Error(Exception):
 
     def __init__(self, msg):
         super().__init__(msg)
+        self.status_code = 503
 
 
 class Qualtrics504Error(Exception):
@@ -59,3 +66,4 @@ class Qualtrics504Error(Exception):
 
     def __init__(self, msg):
         super().__init__(msg)
+        self.status_code = 504
