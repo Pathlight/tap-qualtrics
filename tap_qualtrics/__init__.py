@@ -300,7 +300,11 @@ def get_survey_responses(survey_id, payload, config):
 
     with zipfile.ZipFile(io.BytesIO(download_request.content)) as survey_zip:
         for s in survey_zip.infolist():
-            df = pd.read_csv(survey_zip.open(s.filename))
+            # The CSV reader may sometimes interpret the ticket column IDs as numbers
+            # instead of strings. We enforce the data types here.
+            # https://pathlighthq.atlassian.net/browse/FUJ-4912
+            data_types = {'ticket.id':str,'ticket.assignee.id':str}
+            df = pd.read_csv(survey_zip.open(s.filename), dtype=data_types)
             return df.to_dict('records')
 
 
